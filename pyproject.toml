@@ -1,0 +1,42 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "oic-toolkit"
+dynamic = ["version"]
+description = "Core image analysis and processing utilities for the Optical Imaging Core at VAI"
+#readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "GPL-3.0-or-later" }
+authors = [
+    { name = "Jian Wei Tay", email = "jian.tay@vai.org" }
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Science/Research",
+    "Topic :: Scientific/Engineering :: Bio-Informatics",
+    "Topic :: Scientific/Engineering :: Image Processing",
+    "Programming Language :: Python :: 3",
+]
+
+# Core dependencies that will automatically install when someone pip installs your package
+dependencies = [
+    "numpy>=2.4.6",
+    "scikit-image>=0.26.0",
+    "scipy>=1.17.1",
+    "matplotlib>=3.10.9",
+]
+
+[project.urls]
+Homepage = "https://github.com/vaioic/oic-toolkit"
+Bug-Tracker = "https://github.com/vaioic/oic-toolkit/issues"
+
+# Optional: Add testing dependencies so they don't bloat the main install
+[project.optional-dependencies]
+test = [
+    "pytest>=7.0",
+]
+
+[tool.hatch.version]
+path = "src/oic_toolkit/__init__.py"

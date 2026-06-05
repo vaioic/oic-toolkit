@@ -1,0 +1,39 @@
+{
+  "workbench.colorCustomizations": {
+    // Title Bar (Top of the window)
+    "titleBar.activeBackground": "#231932",
+    "titleBar.activeForeground": "#E2D7F2",
+    "titleBar.inactiveBackground": "#1A1224",
+    "titleBar.inactiveForeground": "#766985",
+
+    // Activity Bar (Far left sidebar icons)
+    "activityBar.background": "#1D142A",
+    "activityBar.foreground": "#BF95FC",
+    "activityBar.inactiveForeground": "#615275",
+    "activityBar.activeBorder": "#BF95FC",
+
+    // Primary Side Bar (File Explorer, Search, Git panels)
+    "sideBar.background": "#1A1224",
+    "sideBar.foreground": "#C8B9DD",
+    "sideBarTitle.foreground": "#BF95FC",
+
+    // Terminal & Bottom Panel Backgrounds
+    "panel.background": "#1D142A",
+    "panel.border": "#2D2042",
+    "panelTitle.activeForeground": "#BF95FC",
+    "panelTitle.inactiveForeground": "#766985",
+
+    // Window Background (Applies to empty editor windows)
+    "editor.background": "#160E1E",
+    "editorWidget.background": "#231932",
+
+    // Status Bar (Bottom ribbon)
+    "statusBar.background": "#1A1224",
+    "statusBar.foreground": "#C8B9DD",
+    "statusBar.debuggingBackground": "#441D6A",
+
+    // Subtle borders to keep the UI crisp
+    "sideBar.border": "#2D2042",
+    "titleBar.border": "#2D2042"
+  }
+}
