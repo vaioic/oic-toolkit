@@ -3,6 +3,8 @@ import skimage as sk
 from matplotlib import pyplot as plt
 from scipy import interpolate, ndimage, spatial
 
+from . import display
+
 
 def register_phasexcorr(target, moving, return_corrected=True):
     """
@@ -25,7 +27,12 @@ def register_phasexcorr(target, moving, return_corrected=True):
         The corrected moving image. Only returned if `return_corrected` is True.
     """
 
+    if len(target.shape) == 3:
+        target = sk.color.rgb2gray(target)
     h0, w0 = target.shape
+
+    if len(moving.shape) == 3:
+        moving = sk.color.rgb2gray(moving)
     hm, wm = moving.shape
 
     # Match the moving to the target shape
@@ -77,42 +84,65 @@ def shift_image(image, shift):
 
 #-- These functions are for template matching/displacement field registration
 
-def calculate_displacement_field(target, moving, grid_size=(10, 10), template_size=200, search_window=100):
+def calculate_displacement_field(target, moving, num_grid=(10, 10), template_size=200, search_window=150, show_plots=False):
 
-    H, W = target.shape
+    # if search_window < template_size:
+    #     raise ValueError(f"The search window must be larger than the template")
+
+    # The basic idea is to divide up the moving image and register it to the target image. The shift defines the displacement at each grid point. In this step, we will be doing this on a low-resolution grid, which will be scaled up via interpolation later to get a smoother displacement field.
+    #
+    # We assume that the images are already *roughly* aligned
+
     
-    # Generate the image grid
-    margin = template_size // 2 + search_window
+    # --- Generate the image grid ---
+    # The image grid should be generated inside the actual image. 
+    # Calculate the margin of the image
+    margin = (template_size // 2) + search_window
 
-    #np.linspace(start, stop, num)
-    y_coords = np.linspace(margin, H - margin, grid_size[0], dtype=int)
-    x_coords = np.linspace(margin, W - margin, grid_size[1], dtype=int)
+    H, W = target.shape  # Define the grid against the target image because this is the size we want to match to
 
+    # Calculate the center of each grid point
+    # Note: np.linspace(start, stop, num)
+    y_coords = np.linspace(margin, H - margin, num_grid[0], dtype=int)
+    x_coords = np.linspace(margin, W - margin, num_grid[1], dtype=int)
+
+    # Initialize empty matrices to store data
     src_points = []
     dst_points = []
 
     for yy in y_coords:
         for xx in x_coords:
 
-            # Calculate the top-left corner position
-            y0, x0 = yy - template_size//2, xx - template_size//2
+            # Calculate the top-left corner position of the template
+            top_template = yy - template_size//2
+            left_template = xx - template_size//2
 
-            template = moving[y0:y0 + template_size,
-                              x0:x0 + template_size]
+            template = moving[top_template:(top_template + template_size),
+                              left_template:(left_template + template_size)]
             
-            # Skip patch if there is no image information
-            if np.std(template) < 0.005:
+            # print(np.std(template))
+            
+            # Skip if there is no image information (i.e., just noise)
+            if np.std(template) < 0.1:
+                print("Skipping patch")
                 continue
 
-            # Define the search window coordinates to reduce computation time 
-            # and avoid off-target matches. The window is clipped to the image
-            # size.
-            wy0, wy1 = max(0, y0 - search_window), min(H, y0 + template_size + search_window)
-            wx0, wx1 = max(0, x0 - search_window), min(W, x0 + template_size + search_window)
+            # Define a search window for the target image
+            # top_target_window = yy - search_window//2
+            # left_target_window = xx - search_window//2
+
+            # target_window = target[
+            #     top_target_window:(top_target_window + search_window),
+            #     left_target_window:(left_target_window + search_window)]
+
+            wy0, wy1 = max(0, top_template - search_window), min(H, top_template + template_size + search_window)
+            wx0, wx1 = max(0, left_template - search_window), min(W, left_template + template_size + search_window)
+
+            target_window = target[wy0:wy1, wx0:wx1]
 
             # Perform the template matching
             try:
-                corr_coeff = sk.feature.match_template(target[wy0:wy1, wx0:wx1], template)
+                corr_coeff = sk.feature.match_template(target_window, template)
 
             except Exception:
                 continue
@@ -120,26 +150,46 @@ def calculate_displacement_field(target, moving, grid_size=(10, 10), template_si
             # Find the highest response
             max_ij = np.unravel_index(np.argmax(corr_coeff), corr_coeff.shape)
 
-            src_points.append([xx, yy])  #Note: Points with no image data are skipped
+            src_points.append([xx, yy])
+
             dst_points.append([max_ij[1] + wx0 + template_size//2, max_ij[0] + wy0 + template_size//2])
+            # dst_points.append([top_template + max_ij[1],
+            #                    left_template + max_ij[0]])
 
-            # # Make some plots
-            # fig = plt.figure(figsize=(8, 3))
-            # ax1 = plt.subplot(1, 2, 1)
-            # ax2 = plt.subplot(1, 2, 2)
+            if show_plots:
+                # Make some plots
+                fig = plt.figure(figsize=(16, 6))
+                ax1 = plt.subplot(1, 3, 1)
+                ax2 = plt.subplot(1, 3, 2)
+                ax3 = plt.subplot(1, 3, 3)
 
-            # ax1.imshow(target[wy0:wy1, wx0:wx1])
-            # ax1.set_axis_off()
+                ax1.imshow(target_window)
+                ax1.set_axis_off()
+                ax1.set_title("Search window (red box indicates matched region)")
 
-            # ax2.imshow(template)
-            # ax2.set_axis_off()
+                x, y = max_ij[::-1]
+                rect = plt.Rectangle((x, y), template_size, template_size, edgecolor='r', facecolor='none')
+                ax1.add_patch(rect)
 
-            # x, y = max_ij[::-1]
-            # rect = plt.Rectangle((x, y), template_size, template_size, edgecolor='r', facecolor='none')
-            # ax1.add_patch(rect)
-            # print(x, y)
+                ax2.imshow(template)
+                ax2.set_axis_off()
+                ax2.set_title("Template")
 
-            # plt.show()
+                # Crop the target image around the destination to double-check
+                left_crop = dst_points[-1][0]
+                top_crop = dst_points[-1][1]
+                target_cropped = target[
+                    top_crop - (template_size // 2):(top_crop + (template_size // 2)),
+                    left_crop - (template_size // 2):(left_crop + (template_size // 2))]
+                
+                merge = display.merge_images(target_cropped, template)
+                
+                ax3.imshow(merge)
+                ax3.set_title("Merged image")
+                
+                plt.show()
+
+                plt.close(fig)
 
         
     return np.array(src_points), np.array(dst_points)
@@ -203,7 +253,7 @@ def estimate_tform(src, dst, target_shape, mesh_grid=(100, 100), max_distance=30
     
     return _, full_src_grid, full_dst_grid
 
-def fast_warp(image_to_warp, target_shape, full_src_grid, full_dst_grid, mesh_grid=(20, 20)):
+def fast_warp(image_to_warp, target_shape, full_src_grid, full_dst_grid, mesh_grid=(100, 100)):
     """
     Instantly warps an image using dense coordinate mapping instead of 
     slow pixel-by-pixel Delaunay triangulation.
