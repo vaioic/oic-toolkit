@@ -2,11 +2,13 @@ import numpy as np
 import skimage as sk
 from matplotlib import pyplot as plt
 from scipy import interpolate, ndimage, spatial
+from scipy.fft import fft2, fftshift
+from scipy.signal import windows
 
 from . import display
 
 
-def register_phasexcorr(target, moving, return_corrected=True):
+def phasexcorr(target, moving, return_corrected=True):
     """
     Attempts to register translational shifts using the phase cross-correlation function. Internally uses scikit-image's phase_cross_correlation function, with some wrapping to match image sizes and perform the correction.
 
@@ -93,6 +95,9 @@ def calculate_displacement_field(target, moving, num_grid=(10, 10), template_siz
     #
     # We assume that the images are already *roughly* aligned
 
+    # Try band-pass filtering
+    target = sk.filters.difference_of_gaussians(target, 5, 20)
+    moving = sk.filters.difference_of_gaussians(moving, 5, 20)
     
     # --- Generate the image grid ---
     # The image grid should be generated inside the actual image. 
@@ -123,7 +128,7 @@ def calculate_displacement_field(target, moving, num_grid=(10, 10), template_siz
             # print(np.std(template))
             
             # Skip if there is no image information (i.e., just noise)
-            if np.std(template) < 0.1:
+            if np.std(template) < 0.01:
                 print("Skipping patch")
                 continue
 
@@ -142,7 +147,10 @@ def calculate_displacement_field(target, moving, num_grid=(10, 10), template_siz
 
             # Perform the template matching
             try:
-                corr_coeff = sk.feature.match_template(target_window, template)
+                template_f=sk.filters.sobel(template)
+                target_window_f = sk.filters.sobel(target_window)
+
+                corr_coeff = sk.feature.match_template(target_window_f, template_f)
 
             except Exception:
                 continue
@@ -324,3 +332,174 @@ def generate_quiver_plot(target, src, dst):
                color='red', angles='xy', scale_units='xy', scale=1, 
                width=0.002, label='Raw Matches')
     plt.show()
+
+def rotation_scale_phasecorr(target, moving, radius=None):
+
+    # Estimate radius to be the smallest dimension
+    h, w = target.shape[:2]
+
+    if not radius:
+        radius = min(h, w)//2
+        
+    target_polar = sk.transform.warp_polar(target, radius=radius, scaling="log")
+    moving_polar = sk.transform.warp_polar(moving, radius=radius, scaling="log")
+
+    shifts, error, phasediff = sk.registration.phase_cross_correlation(
+                                target_polar, moving_polar, upsample_factor=20, normalization=None
+                                )
+    shiftr, shiftc = shifts[:2]
+
+    # Calculate scale factor from translation
+    klog = radius / np.log(radius)
+    shift_scale = 1 / (np.exp(shiftc / klog))
+
+    # Note: shiftr is the number of rows (in polar coordinates, this is the same as angle)
+    rotation_in_degrees = (shiftr / target_polar.shape[0]) * 360.0
+    rotation_in_radians = np.deg2rad(rotation_in_degrees)
+
+    # Calculate the corrected image
+    # Note: SimilarityTransform uses the top left pixel as the center of rotation, while rotate() uses the center of the image. So you have to translate the image before rotating, then transfer back
+    center = np.array([w/2, h/2])
+
+    t1 = sk.transform.SimilarityTransform(translation=-center)
+    t2 = sk.transform.SimilarityTransform(rotation=-rotation_in_radians, scale=shift_scale)
+    t3 = sk.transform.SimilarityTransform(translation=center)
+
+    # Combine the tforms
+    tform = t1 + t2 + t3
+    corrected_image = sk.transform.warp(moving, tform)
+
+    return rotation_in_degrees, shift_scale, corrected_image
+
+
+def plot_diff_gauss(image):
+    sigmas = [(1, 5), (3, 15), (5, 20), (5, 50)]
+
+    fig, axes = plt.subplots(1, 4, figsize=(15, 5))
+    for ax, (s_low, s_high) in zip(axes, sigmas):
+        bpf = sk.filters.difference_of_gaussians(image, s_low, s_high)
+        ax.imshow(bpf, cmap='gray')
+        ax.set_title(f"Low: {s_low}, High: {s_high}")
+        ax.axis('off')
+
+    plt.tight_layout()
+    plt.show()
+
+def log_polar_phasecorr(target, moving, sigma_low=5, sigma_high=20, window_size=None):
+
+    #See:https://scikit-image.org/docs/stable/auto_examples/registration/plot_register_rotation.html
+    
+    # Band pass the images
+    target_bpf = sk.filters.difference_of_gaussians(target, sigma_low, sigma_high)
+    moving_bpf = sk.filters.difference_of_gaussians(moving, sigma_low, sigma_high)
+
+    # Window
+    if window_size is None:
+        window_size = target.shape
+    
+    window = sk.filters.window("hann", window_size)
+    window_padded = window
+
+    _, window_padded = pad_images(target, window)
+
+    target_bpf_w = target_bpf * window_padded
+    moving_bpf_w = moving_bpf * window_padded
+
+    # plt.imshow(target_bpf_w)
+    # plt.show()
+    # exit()
+
+    # FFT shift
+    target_fs = np.abs(fftshift(fft2(target_bpf_w)))
+    moving_fs = np.abs(fftshift(fft2(moving_bpf_w)))
+
+    radius = target_bpf_w.shape[0] // 8 # Take only the lower frequencies
+
+    fs_shape = target.shape
+    h, w = fs_shape
+
+    warped_target_fs = sk.transform.warp_polar(
+        target_fs, radius=radius, output_shape=fs_shape, scaling='log', order=0
+    )
+    warped_moving_fs = sk.transform.warp_polar(
+        moving_fs, radius=radius, output_shape=fs_shape, scaling='log', order=0
+    )
+
+    warped_target_fs = warped_target_fs[: h // 2, :]  # only use half of FFT
+    warped_moving_fs = warped_moving_fs[: h // 2, :]
+
+    # Try masking the images
+    # mask_target = target > 0
+    # mask_moving = moving > 0
+
+    shifts, error, phasediff = sk.registration.phase_cross_correlation(
+        warped_target_fs, warped_moving_fs, upsample_factor=1000, normalization=None
+        # reference_mask=mask_target, moving_mask=mask_moving
+    )
+
+    # Use translation parameters to calculate rotation and scaling parameters
+    shiftr, shiftc = shifts[:2]
+
+    rotation_in_degrees = (shiftr / h) * 360.0
+
+    klog = w / np.log(radius)
+    shift_scale = np.exp(shiftc / klog)
+
+    rotation_in_radians = np.deg2rad(rotation_in_degrees)
+
+    # Calculate the corrected image
+    center = np.array([w/2, h/2])
+
+    t1 = sk.transform.SimilarityTransform(translation=-center)
+    t2 = sk.transform.SimilarityTransform(rotation=-rotation_in_radians, scale=shift_scale)
+    t3 = sk.transform.SimilarityTransform(translation=center)
+
+    # Combine the tforms
+    tform = t1 + t2 + t3
+    corrected_image = sk.transform.warp(moving, tform)
+
+    # Register the image to get the translation
+    shift_translation, error_translation, phasediff_translation = sk.registration.phase_cross_correlation(
+        target, corrected_image, upsample_factor=100)
+    
+    shift_y, shift_x = shift_translation
+
+    tform_translate = sk.transform.SimilarityTransform(translation=(shift_x, shift_y))
+    corrected_image_final = sk.transform.warp(corrected_image, tform_translate.inverse)
+
+    shift_out = (shift_x, shift_y)
+
+    return rotation_in_degrees, shift_scale, shift_out, corrected_image_final
+
+def pad_images(image1, image2):
+
+    # Find the largest of the two images and pad the images centrally
+    h1, w1 = image1.shape
+    h2, w2 = image2.shape
+
+    print(image1.shape)
+    print(image2.shape)
+
+    h_out = np.max([h1, h2])
+    w_out = np.max([w1, w2])
+
+    image1_out = np.ones((h_out, w_out), dtype=image1.dtype) * np.median(image1)
+    
+    h1_left = (w_out - w1)//2
+    h1_top = (h_out - h1)//2
+
+    image1_out[h1_top:(h1_top + h1),
+               h1_left:(h1_left + w1)] = image1
+    
+    image2_out = np.ones((h_out, w_out), dtype=image2.dtype) * np.median(image2)
+    h2_left = (w_out - w2)//2
+    h2_top = (h_out - h2)//2
+
+    image2_out[h2_top:(h2_top + h2),
+               h2_left:(h2_left + w2)] = image2
+    
+    # print(image1_out.shape)
+    # print(image2_out.shape)
+
+    return image1_out, image2_out
+
