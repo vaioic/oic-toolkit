@@ -77,26 +77,16 @@ ax4.set_title("Corrected image")
 
 # Add a fudge to see if I can correct it
 
-
 merge_corr = display.merge_images(target, corrected)
 ax5.imshow(merge_corr)
 ax5.set_title("Merged (corrected)")
 
 # Add the optical flow to see if it can fix the final step
-target_cropped = util.resize_from_center(target, original_image.shape)
-corrected_cropped = util.resize_from_center(corrected, original_image.shape)
+corrected_flow = register.optical_flow_tvl1(target, corrected)
 
-v, u = sk.registration.optical_flow_tvl1(target_cropped, corrected_cropped, prefilter=True)
+merge_after_flow = display.merge_images(target, corrected_flow)
 
-nr, nc = target_cropped.shape
-
-row_coords, col_coords = np.meshgrid(np.arange(nr), np.arange(nc), indexing='ij')
-
-corrected_twice = sk.transform.warp(corrected_cropped, np.array([row_coords + v, col_coords + u]), mode='edge')
-
-merge_twice = display.merge_images(target_cropped, corrected_twice)
-
-ax6.imshow(merge_twice)
+ax6.imshow(merge_after_flow)
 
 plt.show()
 plt.close()

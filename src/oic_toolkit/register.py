@@ -5,7 +5,7 @@ from scipy import interpolate, ndimage, spatial
 from scipy.fft import fft2, fftshift
 from scipy.signal import windows
 
-from . import display
+from . import display, util
 
 
 def phasexcorr(target, moving, return_corrected=True):
@@ -388,6 +388,7 @@ def plot_diff_gauss(image):
 def log_polar_phasecorr(target, moving, sigma_low=5, sigma_high=20, window_size=None):
 
     #See:https://scikit-image.org/docs/stable/auto_examples/registration/plot_register_rotation.html
+    target, moving = pad_images(target, moving)
     
     # Band pass the images
     target_bpf = sk.filters.difference_of_gaussians(target, sigma_low, sigma_high)
@@ -458,18 +459,20 @@ def log_polar_phasecorr(target, moving, sigma_low=5, sigma_high=20, window_size=
     tform = t1 + t2 + t3
     corrected_image = sk.transform.warp(moving, tform)
 
-    # Register the image to get the translation
-    shift_translation, error_translation, phasediff_translation = sk.registration.phase_cross_correlation(
-        target, corrected_image, upsample_factor=100)
+    # # Register the image to get the translation
+    # shift_translation, error_translation, phasediff_translation = sk.registration.phase_cross_correlation(
+    #     target, corrected_image, upsample_factor=100)
     
-    shift_y, shift_x = shift_translation
+    # shift_y, shift_x = shift_translation
 
-    tform_translate = sk.transform.SimilarityTransform(translation=(shift_x, shift_y))
-    corrected_image_final = sk.transform.warp(corrected_image, tform_translate.inverse)
+    # tform_translate = sk.transform.SimilarityTransform(translation=(shift_x, shift_y))
+    # corrected_image_final = sk.transform.warp(corrected_image, tform_translate.inverse)
 
-    shift_out = (shift_x, shift_y)
+    # shift_out = (shift_x, shift_y)
 
-    return rotation_in_degrees, shift_scale, shift_out, corrected_image_final
+    #return rotation_in_degrees, shift_scale, shift_out, corrected_image_final
+
+    return rotation_in_degrees, shift_scale, corrected_image
 
 def pad_images(image1, image2):
 
@@ -477,8 +480,8 @@ def pad_images(image1, image2):
     h1, w1 = image1.shape
     h2, w2 = image2.shape
 
-    print(image1.shape)
-    print(image2.shape)
+    # print(image1.shape)
+    # print(image2.shape)
 
     h_out = np.max([h1, h2])
     w_out = np.max([w1, w2])
@@ -503,3 +506,26 @@ def pad_images(image1, image2):
 
     return image1_out, image2_out
 
+def optical_flow_tvl1(target, moving):
+
+    # Get the SMALLEST image size to prevent shearing
+    ht, wt = target.shape
+    hm, wm = moving.shape
+
+    h = min(ht, wm)
+    w = min(wt, wm)
+
+    #TODO: Try masking the target and moving images - this is not available for the optical flow registration
+    
+    target = util.resize_from_center(target, (h, w))
+    moving = util.resize_from_center(moving, (h, w))
+
+    v, u = sk.registration.optical_flow_tvl1(target, moving, attachment=5, tightness=0.2, prefilter=True)
+
+    nr, nc = target.shape
+
+    row_coords, col_coords = np.meshgrid(np.arange(nr), np.arange(nc), indexing='ij')
+
+    corrected = sk.transform.warp(moving, np.array([row_coords + v, col_coords + u]), mode='edge')
+
+    return u, v, corrected
