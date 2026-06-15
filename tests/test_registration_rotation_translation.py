@@ -5,11 +5,11 @@ from scipy.fft import fft2, fftshift
 
 from oic_toolkit import display, register, util
 
-original_image = sk.data.cat()
+original = sk.data.cat()
 
-print(f"Original image shape: {original_image.shape}")
+print(f"Original image shape: {original.shape}")
 
-original_image = sk.color.rgb2gray(original_image)
+original_image = sk.color.rgb2gray(original)
 
 # register.plot_diff_gauss(original_image)
 
@@ -82,7 +82,9 @@ ax5.imshow(merge_corr)
 ax5.set_title("Merged (corrected)")
 
 # Add the optical flow to see if it can fix the final step
-corrected_flow = register.optical_flow_tvl1(target, corrected)
+u, v = register.optical_flow_tvl1(target, corrected)
+
+corrected_flow_rgb = register.correct_optical_flow(
 
 merge_after_flow = display.merge_images(target, corrected_flow)
 

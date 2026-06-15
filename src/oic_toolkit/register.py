@@ -506,13 +506,85 @@ def pad_images(image1, image2):
 
     return image1_out, image2_out
 
+def match_size(target, moving):
+    """
+    Adjusts the moving image to the target image.
+    
+
+    Parameters
+    ----------
+    target : ndarray
+        Target image to match to
+    moving : ndarray
+        Moving image. Note that the moving image
+
+    Returns
+    -------
+    moving_out : ndarray
+        Moving image with the same size as the target image. If the target image was larger, the moving image will be padded. Otherwise, the moving image will be cropped. The operations are carried out from the center of the original image.
+    """
+    
+    #TODO: Handle if the images are different ranges (e.g., one is uint8 ad the other is float)
+
+    ht, wt = target.shape[:2]
+    hm, wm = moving.shape[:2]
+
+    # moving_out = np.zeros_like(target)
+    moving_out = np.zeros((ht, wt) + moving.shape[2:], dtype=moving.dtype)
+
+    # print(f"Output shape: {moving_out.shape}")
+    # print(f"Output dtype: {moving_out.dtype}")
+
+    if hm <= ht:
+        # Move image down
+        hdiff = (ht - hm)//2
+
+        hstart_out = hdiff
+        hend_out = hdiff + hm
+
+        hstart_in = 0
+        hend_in = hm
+
+    elif hm > ht:
+        hdiff = (hm - ht)//2
+
+        hstart_out = 0
+        hend_out = ht
+
+        hstart_in = hdiff
+        hend_in = hdiff + ht
+   
+    if wm <= wt:
+        # Move image right
+        wdiff = (wt - wm)//2
+
+        wstart_out = wdiff
+        wend_out = wdiff + wm
+
+        wstart_in = 0
+        wend_in = wm
+
+    elif wm > wt:
+        wdiff = (wm - wt)//2
+
+        wstart_out = 0
+        wend_out = wm
+
+        wstart_in = wdiff
+        wend_in = wdiff + wt
+
+    moving_out[hstart_out:hend_out, wstart_out:wend_out, ...] = moving[hstart_in:hend_in, wstart_in:wend_in, ...]   
+
+    return moving_out
+
+
 def optical_flow_tvl1(target, moving):
 
     # Get the SMALLEST image size to prevent shearing
     ht, wt = target.shape
     hm, wm = moving.shape
 
-    h = min(ht, wm)
+    h = min(ht, hm)
     w = min(wt, wm)
 
     #TODO: Try masking the target and moving images - this is not available for the optical flow registration
@@ -522,10 +594,23 @@ def optical_flow_tvl1(target, moving):
 
     v, u = sk.registration.optical_flow_tvl1(target, moving, attachment=5, tightness=0.2, prefilter=True)
 
-    nr, nc = target.shape
+    return u, v
 
+def correct_optical_flow(image, u, v):
+
+    nr, nc = image.shape[:2]
+    
     row_coords, col_coords = np.meshgrid(np.arange(nr), np.arange(nc), indexing='ij')
 
-    corrected = sk.transform.warp(moving, np.array([row_coords + v, col_coords + u]), mode='edge')
+    if len(image.shape) > 2:
+        num_channels = image.shape[2]
 
-    return u, v, corrected
+        corrected = np.zeros_like(image)
+        for iC in range(num_channels):
+            corrected[:, :, iC] = sk.transform.warp(image[:, :, iC], np.array([row_coords + v, col_coords + u]), mode='edge')
+
+    else:
+
+        corrected = sk.transform.warp(image, np.array([row_coords + v, col_coords + u]), mode='edge')
+        
+    return corrected
