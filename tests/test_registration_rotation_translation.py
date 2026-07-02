@@ -1,9 +1,7 @@
-import numpy as np
 import skimage as sk
 from matplotlib import pyplot as plt
-from scipy.fft import fft2, fftshift
 
-from oic_toolkit import display, register, util
+from oic_toolkit import display, register
 
 original = sk.data.cat()
 
@@ -19,7 +17,9 @@ rotation_degrees = 25
 scaling = 1.15
 translation = (15, 21)
 
-modified_image = sk.transform.rotate(original_image, rotation_degrees) #TODO: Test with a non-center origin
+modified_image = sk.transform.rotate(
+    original_image, rotation_degrees
+)  # TODO: Test with a non-center origin
 modified_image = sk.transform.rescale(modified_image, scaling)
 
 # Also try translation
@@ -42,7 +42,11 @@ if wp > w0:
 
 print(f"Window size: {(h_window, w_window)}")
 
-shift_rotation, shift_scale, shift_translation, corrected = register.log_polar_phasecorr(target, moving, sigma_low=5, sigma_high=30, window_size=(h_window, w_window))
+shift_rotation, shift_scale, shift_translation, corrected = (
+    register.log_polar_phasecorr(
+        target, moving, sigma_low=5, sigma_high=30, window_size=(h_window, w_window)
+    )
+)
 
 print(f"Recovered rotation: {shift_rotation}. Expected: {rotation_degrees}")
 print(f"Recovered scale: {shift_scale}. Expected: {scaling}")
@@ -84,9 +88,9 @@ ax5.set_title("Merged (corrected)")
 # Add the optical flow to see if it can fix the final step
 u, v = register.optical_flow_tvl1(target, corrected)
 
-corrected_flow_rgb = register.correct_optical_flow(
+corrected_flow_rgb = register.correct_optical_flow(corrected, u, v)
 
-merge_after_flow = display.merge_images(target, corrected_flow)
+merge_after_flow = display.merge_images(target, corrected_flow_rgb)
 
 ax6.imshow(merge_after_flow)
 

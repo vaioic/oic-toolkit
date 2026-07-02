@@ -1,6 +1,64 @@
-# Image files
-*.png
+# Microscope Raw Data and Formats
+
+# Zeiss
+*.czi
+*.zvi
+
+# Leica
+*.lif
+*.lei
+*.scn
+
+# Nikon
+*.nd2
+
+# Olympus / Evident
+*.vsi
+*.oib
+*.oif
+
+# Keyence
+*.bch
+
+# Hamamatsu
+*.ndpi
+*.vms
+
+# PerkinElmer
+*.qptiff
+*.flex
+
+# Generic/Open Formats
+*.ome.tiff
+*.ome.tif
+*.ome.zarr
+*.zarr/
+*.hdf5
+*.h5
+
+# Imaris
+*.ims
+
+# Amira/Avizo
+*.am
+*.hx
+
+# Slide scanner formats / Whole Slide Imaging
+*.svs
+*.mrxs
 *.tif
+*.tiff
+
+# Metadata and proprietary log files
+*.log
+*.xml
+*.inf
+
+# ImageJ/Fiji specifics
+*.roi
+*.zip
+
+# Python template from https://github.com/github/gitignore
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
@@ -51,6 +109,7 @@ nosetests.xml
 coverage.xml
 *.cover
 *.py.cover
+*.lcov
 .hypothesis/
 .pytest_cache/
 cover/
@@ -126,13 +185,14 @@ ipython_config.py
 # pixi.lock
 #   Pixi creates a virtual environment in the .pixi directory, just like venv module creates one
 #   in the .venv directory. It is recommended not to include this directory in version control.
-.pixi
+.pixi/*
+!.pixi/config.toml
 
 # PEP 582; used by e.g. github.com/David-OConnor/pyflow and github.com/pdm-project/pdm
 __pypackages__/
 
 # Celery stuff
-celerybeat-schedule
+celerybeat-schedule*
 celerybeat.pid
 
 # Redis
@@ -204,6 +264,8 @@ cython_debug/
 #   and can be added to the global gitignore or merged into this file. However, if you prefer, 
 #   you could uncomment the following to ignore the entire vscode folder
 # .vscode/
+# Temporary file for partial code execution
+tempCodeRunnerFile.py
 
 # Ruff stuff:
 .ruff_cache/
