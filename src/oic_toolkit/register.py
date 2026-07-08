@@ -3,6 +3,10 @@ import skimage as sk
 from matplotlib import pyplot as plt
 from scipy import interpolate, ndimage, spatial
 from scipy.fft import fft2, fftshift
+from scipy.sparse import lil_matrix
+from scipy.sparse.linalg import lsqr
+
+from oic_toolkit._internal import validate_path
 
 from . import display, util
 
@@ -789,3 +793,234 @@ def correct_optical_flow(image, u, v):
         )
 
     return corrected
+
+
+# --- Stitching ---#
+def stitch_xy(image_path, numX, numY, overlap=15, file_pattern="img_{ii}.tif"):
+
+    # Validate image_path
+    image_path = validate_path(image_path)
+
+    if not image_path.exists():
+        raise FileNotFoundError(f"Directory {image_path} does not exist.")
+
+    # Check that the files exist
+    file_pattern_r = file_pattern.replace("{ii}", "[0-9][0-9]")
+
+    file_list = list(image_path.glob(file_pattern_r))
+
+    if len(file_list) == 0:
+        raise FileNotFoundError(
+            f"No files matching the pattern '{file_pattern}' was found."
+        )
+    elif len(file_list) != (numX * numY):
+        raise FileNotFoundError(
+            f"Expected {numX * numY} files, but found only {len(file_list)}."
+        )
+
+    # Load one file to get dimensions for the stitched image
+    image = sk.io.imread(file_list[0])
+
+    tile_h, tile_w = image.shape[:2]
+    dtype = image.dtype
+
+    # print(dtype)
+    # exit()
+
+    # To avoid needing to load ALL the images into memory at once, the plan is to load
+    # two rows. Once the top row is registered to the bottom, it can be popped off and
+    # the top row is now the bottom row and the code can continue.
+
+    tile_cache = {}
+
+    H_displacements = {}
+    V_displacements = {}
+
+    for row in range(numY):
+        for col in range(numX):
+            curr_tile_idx = (row * numX) + col
+
+            print(f"({row}, {col}): {curr_tile_idx}")
+
+            if curr_tile_idx not in tile_cache:
+                tile_cache[curr_tile_idx] = sk.io.imread(file_list[curr_tile_idx])
+
+            if col < (numX - 1):
+                # Load the right tile
+                right_tile_idx = curr_tile_idx + 1
+
+                if right_tile_idx not in tile_cache:
+                    tile_cache[right_tile_idx] = sk.io.imread(file_list[right_tile_idx])
+
+                H_displacements[(col, row)] = _match_edges(
+                    tile_cache[curr_tile_idx],
+                    tile_cache[right_tile_idx],
+                    direction="h",
+                    overlap_percent=overlap,
+                )
+
+            if row < (numY - 1):
+                bottom_tile_idx = curr_tile_idx + numX
+                if bottom_tile_idx not in tile_cache:
+                    tile_cache[bottom_tile_idx] = sk.io.imread(
+                        file_list[bottom_tile_idx]
+                    )
+
+                V_displacements[(col, row)] = _match_edges(
+                    tile_cache[curr_tile_idx],
+                    tile_cache[bottom_tile_idx],
+                    direction="v",
+                    overlap_percent=overlap,
+                )
+
+        if row > 0:
+            for col in range(numX):
+                idx_to_pop = (row - 1) * numX + col
+                tile_cache.pop(idx_to_pop, None)
+
+    # Clear out remaining tiles from registration phase
+    tile_cache.clear()
+
+    # --- PASS 2: Global Optimization Solver ---
+    abs_x, abs_y = _solve_global_positions(numX, numY, H_displacements, V_displacements)
+
+    # --- PASS 3: Generate Canvas and Stream/Blend Images One-by-One ---
+    canvas_w = int(np.max(abs_x) + tile_w)
+    canvas_h = int(np.max(abs_y) + tile_h)
+
+    print(f"Canvas size: {canvas_w}x{canvas_h}")
+
+    canvas = np.zeros((canvas_h, canvas_w), dtype=np.float32)
+    weight_canvas = np.zeros((canvas_h, canvas_w), dtype=np.float32)
+
+    # Generate linear alpha feathering masks based on your overlap setting
+    overlap_frac = (overlap / 100.0) if overlap > 1 else overlap
+    ov_x, ov_y = int(tile_w * overlap_frac), int(tile_h * overlap_frac)
+
+    ramp_y = np.ones(tile_h, dtype=np.float32)
+    ramp_x = np.ones(tile_w, dtype=np.float32)
+    if ov_y > 0:
+        ramp_y[:ov_y] = np.linspace(0, 1, ov_y)
+        ramp_y[-ov_y:] = np.linspace(1, 0, ov_y)
+    if ov_x > 0:
+        ramp_x[:ov_x] = np.linspace(0, 1, ov_x)
+        ramp_x[-ov_x:] = np.linspace(1, 0, ov_x)
+    tile_mask = np.outer(ramp_y, ramp_x)
+
+    # Blend target frames directly onto normalized matrix map
+    for idx, file_path in enumerate(file_list):
+        tile = sk.io.imread(file_path).astype(np.float32)
+        x_start, y_start = int(abs_x[idx]), int(abs_y[idx])
+
+        canvas[y_start : y_start + tile_h, x_start : x_start + tile_w] += (
+            tile * tile_mask
+        )
+        weight_canvas[y_start : y_start + tile_h, x_start : x_start + tile_w] += (
+            tile_mask
+        )
+
+    weight_canvas[weight_canvas == 0] = 1.0
+    final_canvas = canvas / weight_canvas
+
+    max_val = np.iinfo(dtype).max if np.issubdtype(dtype, np.integer) else 1.0
+    return np.clip(final_canvas, 0, max_val).astype(dtype)
+
+
+def _match_edges(tile_a, tile_b, overlap_percent, direction="h"):
+    h, w = tile_a.shape[:2]
+
+    if overlap_percent > 1:
+        overlap_percent = overlap_percent / 100
+
+    overlap_x = int(overlap_percent * w)
+    overlap_y = int(overlap_percent * h)
+
+    match direction.lower():
+        case "h":
+            # Assume that tile_b is to the RIGHT of tile_a
+            crop_a = tile_a[:, (w - overlap_x) :]
+            crop_b = tile_b[:, :overlap_x]
+
+            # Sanity check
+            if crop_a.shape != crop_b.shape:
+                print(crop_a.shape)
+                print(crop_b.shape)
+                raise ValueError("The matrices are different shapes")
+
+            # Run the cross-correlation
+            shift, _, _ = sk.registration.phase_cross_correlation(
+                crop_a, crop_b, upsample_factor=8
+            )
+
+            dx = (w - overlap_x) + shift[1]
+            dy = shift[0]
+            return dx, dy
+
+        case "v":
+            # Assume that tile_b is BELOW tile_a
+            crop_a = tile_a[(h - overlap_y) :, :]
+            crop_b = tile_b[:overlap_y, :]
+
+            # Sanity check
+            if crop_a.shape != crop_b.shape:
+                print(crop_a.shape)
+                print(crop_b.shape)
+                raise ValueError("The matrices are different shapes")
+
+            # Run the cross-correlation
+            shift, _, _ = sk.registration.phase_cross_correlation(
+                crop_a, crop_b, upsample_factor=8
+            )
+
+            dx = shift[1]
+            dy = (h - overlap_y) + shift[0]
+            return dx, dy
+
+
+def _solve_global_positions(numX, numY, H_displacements, V_displacements):
+    """
+    Solves a least-squares matrix system mapping relative tile shifts
+    to absolute (X, Y) canvas coordinates.
+    """
+    n_tiles = numX * numY
+    n_constraints = (numX - 1) * numY + numX * (numY - 1)
+
+    # Initialize sparse linear equations matrices: A * coordinates = b
+    A = lil_matrix((n_constraints + 1, n_tiles), dtype=np.float32)
+    b_x = np.zeros(n_constraints + 1, dtype=np.float32)
+    b_y = np.zeros(n_constraints + 1, dtype=np.float32)
+
+    eq_idx = 0
+    # Map Horizontal constraints: tile(x+1) - tile(x) = dx
+    for row in range(numY):
+        for col in range(numX - 1):
+            idx1 = row * numX + col
+            idx2 = idx1 + 1
+            A[eq_idx, idx1] = -1
+            A[eq_idx, idx2] = 1
+            b_x[eq_idx], b_y[eq_idx] = H_displacements[(col, row)]
+            eq_idx += 1
+
+    # Map Vertical constraints: tile(y+1) - tile(y) = dy
+    for row in range(numY - 1):
+        for col in range(numX):
+            idx1 = row * numX + col
+            idx2 = idx1 + numX
+            A[eq_idx, idx1] = -1
+            A[eq_idx, idx2] = 1
+            b_x[eq_idx], b_y[eq_idx] = V_displacements[(col, row)]
+            eq_idx += 1
+
+    # Pin anchor frame (0,0) down to absolute coordinate (0,0)
+    A[eq_idx, 0] = 1
+    b_x[eq_idx], b_y[eq_idx] = 0.0, 0.0
+
+    # Solve system using Sparse Least Squares
+    sol_x = lsqr(A.tocsr(), b_x)[0]
+    sol_y = lsqr(A.tocsr(), b_y)[0]
+
+    # Normalize coordinate origin to zero
+    sol_x -= np.min(sol_x)
+    sol_y -= np.min(sol_y)
+
+    return sol_x, sol_y
