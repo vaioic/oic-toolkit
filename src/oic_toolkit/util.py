@@ -8,7 +8,7 @@ import skimage as sk
 
 def downsample_image(image, output_path=None, ds_factor=8, normalize=False):
     """
-    Downsample and optically save an image.
+    Downsample and optionally save an image.
 
     Parameters
     ----------
