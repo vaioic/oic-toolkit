@@ -28,3 +28,15 @@ sphinx_gallery_conf = {
     "gallery_dirs": "auto_examples",  # Where Sphinx will put the generated HTML outputs
     "image_scrapers": ("matplotlib",),
 }
+
+autoapi_options = [
+    "members",
+    "undoc-members",
+    "show-inheritance",
+    "show-module-summary",
+    "special-members",
+    "imported-members",
+    # "private-members",
+]
+
+autoapi_ignore = ["*_internal.py"]

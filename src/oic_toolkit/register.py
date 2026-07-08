@@ -1,3 +1,5 @@
+"""Functions for image registration."""
+
 import numpy as np
 import skimage as sk
 from matplotlib import pyplot as plt

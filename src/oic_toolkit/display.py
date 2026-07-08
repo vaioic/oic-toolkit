@@ -1,3 +1,5 @@
+"""Functions for plotting or generating images."""
+
 import numpy as np
 import skimage as sk
 from matplotlib import pyplot as plt

@@ -1,3 +1,5 @@
+"""Functions for object segmentation."""
+
 import numpy as np
 import skimage as sk
 from scipy import ndimage as ndi
