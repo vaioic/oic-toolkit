@@ -821,8 +821,11 @@ def stitch_xy(image_path, numX, numY, overlap=15, file_pattern="img_{ii}.tif"):
     # Load one file to get dimensions for the stitched image
     image = sk.io.imread(file_list[0])
 
-    tile_w, tile_h = image.shape[:2]
+    tile_h, tile_w = image.shape[:2]
     dtype = image.dtype
+
+    # print(dtype)
+    # exit()
 
     # To avoid needing to load ALL the images into memory at once, the plan is to load
     # two rows. Once the top row is registered to the bottom, it can be popped off and
@@ -884,6 +887,8 @@ def stitch_xy(image_path, numX, numY, overlap=15, file_pattern="img_{ii}.tif"):
     # --- PASS 3: Generate Canvas and Stream/Blend Images One-by-One ---
     canvas_w = int(np.max(abs_x) + tile_w)
     canvas_h = int(np.max(abs_y) + tile_h)
+
+    print(f"Canvas size: {canvas_w}x{canvas_h}")
 
     canvas = np.zeros((canvas_h, canvas_w), dtype=np.float32)
     weight_canvas = np.zeros((canvas_h, canvas_w), dtype=np.float32)
@@ -947,7 +952,7 @@ def _match_edges(tile_a, tile_b, overlap_percent, direction="h"):
                 crop_a, crop_b, upsample_factor=8
             )
 
-            dx = overlap_x + shift[1]
+            dx = (w - overlap_x) + shift[1]
             dy = shift[0]
             return dx, dy
 

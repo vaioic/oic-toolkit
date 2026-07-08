@@ -133,6 +133,12 @@ instance/
 
 # Sphinx documentation
 docs/_build/
+docs/autoapi/
+docs/auto_examples/
+
+examples/*.ipynb
+examples/*.md5
+
 
 # PyBuilder
 .pybuilder/
