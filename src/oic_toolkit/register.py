@@ -807,7 +807,7 @@ def stitch_xy(image_path, numX, numY, overlap=15, file_pattern="img_{ii}.tif"):
     # Check that the files exist
     file_pattern_r = file_pattern.replace("{ii}", "[0-9][0-9]")
 
-    file_list = list(image_path.glob(file_pattern_r))
+    file_list = sorted(list(image_path.glob(file_pattern_r)))
 
     if len(file_list) == 0:
         raise FileNotFoundError(
