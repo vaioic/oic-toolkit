@@ -6,7 +6,7 @@ readme = "README.md"
 authors = [
     { name = "Jian Wei Tay", email = "jian.tay@vai.org" }
 ]
-requires-python = ">=3.14"
+requires-python = ">=3.13"
 dependencies = [
     "imagecodecs>=2026.6.26",
     "matplotlib>=3.11.0",

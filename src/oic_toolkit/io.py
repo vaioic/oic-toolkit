@@ -27,18 +27,18 @@ def export_pyramid_tiff(output_path, image):
 
     with tifffile.TiffWriter(output_path, bigtiff=True) as tiff:
         print("Writing TIFF")
-        options = dict(tile=(256, 256), compression="jpeg")
+        options = dict(tile=(256, 256), compression="lzw", photometric="minisblack")
 
         # Write the base resolution (Level 0)
         tiff.write(
             image,
             subifds=3,  # Number of downsampled levels to follow
-            metadata={"axes": "CYX"},
+            metadata={"axes": "YX", "SignificantBits": 16},
             **options,
         )
 
         # Write downsampled levels
         for factor in [2, 4, 8]:
             # Downsample data using simple indexing
-            downsampled = image[:, ::factor, ::factor]
+            downsampled = image[::factor, ::factor]
             tiff.write(downsampled, subfiletype=1, **options)
