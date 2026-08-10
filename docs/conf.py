@@ -10,6 +10,7 @@ author = "Jian Wei Tay"
 
 # Step 2b: Register extensions
 extensions = [
+    "myst_parser",
     "autoapi.extension",
     "sphinx.ext.napoleon",  # Parses NumPy-style docstrings
     "sphinx_gallery.gen_gallery",  # Executes examples and builds the gallery webpage

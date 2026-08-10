@@ -6,7 +6,7 @@
 
 Computation times
 =================
-**00:00.694** total execution time for 1 file **from all galleries**:
+**00:03.579** total execution time for 1 file **from all galleries**:
 
 .. container::
 
@@ -33,5 +33,5 @@ Computation times
      - Time
      - Mem (MB)
    * - :ref:`sphx_glr_auto_examples_plot_stitching_chelsea.py` (``..\examples\plot_stitching_chelsea.py``)
-     - 00:00.694
+     - 00:03.579
      - 0.0
