@@ -4,6 +4,10 @@ A consolidated Python package for image informatics and bioimage analysis workfl
 
 ## Getting Started
 
+These instructions are for **developers** working to build or maintain the toolkit. For
+regular users, please see the [main
+documentation](https://vaioic.github.io/oic-toolkit/) for installation and usage.
+
 ### Installation
 
 You can install the library directly either from PyPi or from this repository.
