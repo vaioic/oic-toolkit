@@ -1,7 +1,7 @@
 """
-============
+====================
 2D stitching
-============
+====================
 
 This example uses the classic scikit-image cat Chelsea to demonstrate 2D stitching. The
 image is divided into a grid of 9 tiles, with 15 percent overlap.

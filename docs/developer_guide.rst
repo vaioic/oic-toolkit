@@ -6,5 +6,3 @@ new functions. A typical user should not need to use these functions for image a
 
 Internal functions
 ------------------
-
-.. automodule:: 

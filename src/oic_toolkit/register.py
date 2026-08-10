@@ -38,7 +38,8 @@ def phasexcorr(target, moving, return_corrected=True):
     -------
     results: dict
         Dictionary containing the "shift", "error" and "diffphase" of the phase
-        cross-correlation.
+        cross-correlation. Note that positive shift values means moving the image
+        down/right.
     moving_corrected : ndarray, optional
         The corrected moving image. Only returned if `return_corrected` is True.
     """
@@ -70,7 +71,20 @@ def phasexcorr(target, moving, return_corrected=True):
     if return_corrected:
         moving_corrected = ndimage.shift(moving_final, shift=shift, cval=0.0)
 
-        return results, moving_corrected
+        # Convert shifts to rounded integer pixel bounds
+        sy, sx = np.round(shift).astype(int)
+
+        # Calculate overlap bounds
+        r_start = max(0, sy)
+        r_end = min(h0, h0 + sy)
+        c_start = max(0, sx)
+        c_end = min(w0, w0 + sx)
+
+        # Crop both images to the valid overlapping region
+        target_cropped = target[r_start:r_end, c_start:c_end]
+        moving_cropped = moving_corrected[r_start:r_end, c_start:c_end]
+
+        return results, moving_cropped, target_cropped
 
     else:
         return results

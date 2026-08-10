@@ -23,6 +23,23 @@ If you need the latest bleeding-edge version (which likely contains bugs and oth
 pip install "oic-toolkit @ git+https://github.com/vaioic/oic-toolkit.git@dev"
 ```
 
+## Documentation
+
+To build documentation:
+
+```bash
+uv run sphinx-build -b html docs docs/_build/html
+```
+
+To view:
+```bash
+cd docs/_build/html
+uv run python -m http.server 8001
+```
+Open browser and point to http://localhost:8001
+
+To refresh, just rebuild in a new terminal.
+
 ### Issues
 
 If you encounter any issues with running the code or have any questions, please create an [Issue](https://github.com/vaioic/template-analysis-uv/issues) or send an email to opticalimaging@vai.org. If you are reporting a bug, please include any error messages to aid with troubleshooting.

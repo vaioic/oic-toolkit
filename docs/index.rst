@@ -1,31 +1,38 @@
-# Welcome to the OIC Toolkit Wiki!
+=================================
+Welcome to the OIC Toolkit Wiki!
+=================================
 
 The ``oic-toolkit`` is a consolidated Python package of useful image analysis functions 
 developed by the Van Andel Institute Optical Imaging Core. The toolkit features a blend
 of custom algorithms and workflows derived from scikit-image and scipy.
 
-## Features
+Features
+--------
 
 * Distance-based watershed algorithms
 * Generating annotated plots to visualize segmentation results
 * Stitching of tiled images
 * ... and more!
 
-## Getting Started
+Getting Started
+---------------
 
-### Installation
+Installation
+~~~~~~~~~~~~
 
-```bash
-pip install oic-toolkit
-```
+.. code-block:: bash
 
-### Usage
+   pip install oic-toolkit
 
-```python
-from oic_toolkit import *
-```
+Usage
+~~~~~
 
-#### Modules
+.. code-block:: python
+
+   from oic_toolkit import *
+
+Modules
+^^^^^^^
 
 The toolkit is organized into modular components that address specific bottlenecks in bioimage workflows:
 
@@ -38,12 +45,12 @@ The toolkit is organized into modular components that address specific bottlenec
 
 See the section below for a list of all the full API.
 
-## Content Navigation
+Content Navigation
+------------------
 
-```{toctree}
-:maxdepth: 2
-:caption: Contents
+.. toctree::
+   :maxdepth: 2
+   :caption: Contents
 
-auto_examples/index
-autoapi/index
-```
+   auto_examples/index
+   autoapi/index
