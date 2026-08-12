@@ -72,7 +72,7 @@ def phasexcorr(target, moving, return_corrected=True):
         return results
 
 
-def shift_image(image, shift):
+def shift_image(image, shift, crop=True, image_type="moving", tmp_shape=None):
     """
     Translate image.
 
@@ -91,9 +91,34 @@ def shift_image(image, shift):
     _type_
         _description_
     """
-    shifted_image = ndimage.shift(image, shift=shift, cval=0.0)
+    if tmp_shape is None:
+        h0, w0 = image.shape
+    else:
+        h0, w0 = tmp_shape
 
-    return shifted_image
+    # Convert shifts to rounded integer pixel bounds
+    sy, sx = np.round(shift).astype(int)
+
+    # Calculate overlap bounds
+    r_start = max(0, sy)
+    r_end = min(h0, h0 + sy)
+    c_start = max(0, sx)
+    c_end = min(w0, w0 + sx)
+
+    if image_type == "moving":
+        shifted_image = ndimage.shift(image, shift=shift, cval=0.0)
+
+        if crop:
+            output = shifted_image[r_start:r_end, c_start:c_end]
+
+    elif image_type == "target":
+        if crop:
+            print("Cropping target image")
+            output = image[r_start:r_end, c_start:c_end]
+    else:
+        output = image
+
+    return output
 
 
 # -- These functions are for template matching/displacement field registration
