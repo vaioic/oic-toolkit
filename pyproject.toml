@@ -1,13 +1,14 @@
 [project]
 name = "oic-toolkit"
-version = "0.1.0"
+version = "0.2.1"
 description = "Core image analysis and processing utilities for the VAI Optical Imaging Core"
 readme = "README.md"
 authors = [
     { name = "Jian Wei Tay", email = "jian.tay@vai.org" }
 ]
-requires-python = ">=3.14"
+requires-python = ">=3.13"
 dependencies = [
+    "imagecodecs>=2026.6.26",
     "matplotlib>=3.11.0",
     "numpy>=2.5.0",
     "pandas>=3.0.3",

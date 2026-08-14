@@ -1,7 +1,7 @@
 """
-============
+====================
 2D stitching
-============
+====================
 
 This example uses the classic scikit-image cat Chelsea to demonstrate 2D stitching. The
 image is divided into a grid of 9 tiles, with 15 percent overlap.
@@ -15,7 +15,7 @@ from skimage.data import chelsea
 from skimage.io import imsave
 
 # Import your active processing functions
-from oic_toolkit.register import stitch_xy
+from oic_toolkit.register import generate_tiled_image, stitch_xy
 
 # Setup a temporary directory path inside the example execution runtime
 mock_dir = Path("./temp_cat_tiles")
@@ -45,9 +45,11 @@ for row in range(numY):
 # ------------------------------
 # Now we call our core `stitch_xy` function.
 
-stitched_result = stitch_xy(
+abs_x, abs_y = stitch_xy(
     image_path=mock_dir, numX=numX, numY=numY, overlap=overlap_percent
 )
+
+stitched_result = generate_tiled_image(mock_dir, abs_x=abs_x, abs_y=abs_y)
 
 # #############################################################################
 # Visualizing the Blended Result
@@ -62,7 +64,38 @@ ax.set_title(
 ax.axis("off")
 plt.show()
 
+###############################
+# Saving the stitching coordinates
+import pandas as pd
+
+tile_indices = list(range(len(abs_x)))
+
+# Build the DataFrame and export to CSV
+df = pd.DataFrame({"tile_index": tile_indices, "abs_x": abs_x, "abs_y": abs_y})
+df.to_csv(mock_dir / "tile_positions.csv", index=False)
+
+####
+
+
+df = pd.read_csv(mock_dir / "tile_positions.csv")
+
+# Extract the columns directly back into simple Python lists
+abs_x = df["abs_x"].tolist()
+abs_y = df["abs_y"].tolist()
+
+stitched_result2 = generate_tiled_image(mock_dir, abs_x=abs_x, abs_y=abs_y)
+
+fig, ax = plt.subplots(figsize=(8, 6))
+ax.imshow(stitched_result2, cmap="gray")
+ax.set_title(
+    f"Stitched Image ({stitched_result2.shape[1]}x{stitched_result2.shape[0]})"
+)
+ax.axis("off")
+plt.show()
+
 # Clean up temporary disk files when compilation finishes
 for f in mock_dir.glob("*.tif"):
+    f.unlink()
+for f in mock_dir.glob("*.csv"):
     f.unlink()
 mock_dir.rmdir()

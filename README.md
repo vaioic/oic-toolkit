@@ -4,6 +4,10 @@ A consolidated Python package for image informatics and bioimage analysis workfl
 
 ## Getting Started
 
+These instructions are for **developers** working to build or maintain the toolkit. For
+regular users, please see the [main
+documentation](https://vaioic.github.io/oic-toolkit/) for installation and usage.
+
 ### Installation
 
 You can install the library directly either from PyPi or from this repository.
@@ -18,6 +22,23 @@ If you need the latest bleeding-edge version (which likely contains bugs and oth
 ```bash
 pip install "oic-toolkit @ git+https://github.com/vaioic/oic-toolkit.git@dev"
 ```
+
+## Documentation
+
+To build documentation:
+
+```bash
+uv run sphinx-build -b html docs docs/_build/html
+```
+
+To view:
+```bash
+cd docs/_build/html
+uv run python -m http.server 8001
+```
+Open browser and point to http://localhost:8001
+
+To refresh, just rebuild in a new terminal.
 
 ### Issues
 

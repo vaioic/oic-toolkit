@@ -1,3 +1,5 @@
+"""Functions for object segmentation."""
+
 import numpy as np
 import skimage as sk
 from scipy import ndimage as ndi
@@ -52,7 +54,7 @@ def match_color(image, target_rgb, radius=10):
     image : ndarray
         Image to segment, must be RGB
     target_rgb : tuple
-        Target color to match (R, G, B)
+        Target color to match (R, G, B). This must be specified as uint8.
     radius : int, optional
         Radius of matching color, by default 10. The larger the radius, the more colors
         will be matched

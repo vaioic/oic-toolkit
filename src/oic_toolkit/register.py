@@ -1,3 +1,7 @@
+"""Functions for image registration."""
+
+import warnings
+
 import numpy as np
 import skimage as sk
 from matplotlib import pyplot as plt
@@ -34,7 +38,8 @@ def phasexcorr(target, moving, return_corrected=True):
     -------
     results: dict
         Dictionary containing the "shift", "error" and "diffphase" of the phase
-        cross-correlation.
+        cross-correlation. Note that positive shift values means moving the image
+        down/right.
     moving_corrected : ndarray, optional
         The corrected moving image. Only returned if `return_corrected` is True.
     """
@@ -57,7 +62,7 @@ def phasexcorr(target, moving, return_corrected=True):
 
     # Run the phase cross-correlation to register the images
     shift, error, diffphase = sk.registration.phase_cross_correlation(
-        target, moving_final, disambiguate=True
+        target, moving_final, disambiguate=True, upsample_factor=10
     )
 
     # Combine the output metrics
@@ -66,7 +71,20 @@ def phasexcorr(target, moving, return_corrected=True):
     if return_corrected:
         moving_corrected = ndimage.shift(moving_final, shift=shift, cval=0.0)
 
-        return results, moving_corrected
+        # Convert shifts to rounded integer pixel bounds
+        sy, sx = np.round(shift).astype(int)
+
+        # Calculate overlap bounds
+        r_start = max(0, sy)
+        r_end = min(h0, h0 + sy)
+        c_start = max(0, sx)
+        c_end = min(w0, w0 + sx)
+
+        # Crop both images to the valid overlapping region
+        target_cropped = target[r_start:r_end, c_start:c_end]
+        moving_cropped = moving_corrected[r_start:r_end, c_start:c_end]
+
+        return results, moving_cropped, target_cropped
 
     else:
         return results
@@ -822,7 +840,46 @@ def correct_optical_flow(image, u, v):
 
 # --- Stitching ---#
 def stitch_xy(image_path, numX, numY, overlap=15, file_pattern="img_{ii}.tif"):
+    """
+    Stitch image tiles into a large image.
 
+    This function assumes that images are collected in a grid from left-to-right by row.
+    The images must follow the naming scheme: <base>_<index>.tif, e.g.,"img_01.tif",
+    "img_02.tif", ... The index must be in sequence.
+
+    Note that it is CRITICAL that the image names include the leading 0, otherwise the
+    images could be sorted incorrectly. This is due entirely to how filenames are sorted
+    on different operating systems.
+
+    Under the hood, the function uses phase cross correlation to quickly determine
+    translational shifts. Note that only translational shifts can be corrected by this
+    function.
+
+    Parameters
+    ----------
+    image_path : str or Path
+        Path to the iamge directory
+    numX : int
+        Number of tiles along the x-axis (i.e., columns)
+    numY : int
+        Number of tiles along the y-axis (i.e., rows)
+    overlap : int, optional
+        Percent overlap of the tiles, by default 15. This should match your setting on
+        the microscope.
+    file_pattern : str, optional
+        Pattern of the filenames, by default "img_{ii}.tif". Must include "{ii}" to
+        indicate the tile index.
+
+    Raises
+    ------
+    FileNotFoundError
+        The image directory was not found. Please check the path.
+    FileNotFoundError
+        No image files were found that matched file_pattern.
+    FileNotFoundError
+        Insufficient image tiles were found. The expected number of tiles are numX *
+        numY.
+    """
     # Validate image_path
     image_path = validate_path(image_path)
 
@@ -832,7 +889,8 @@ def stitch_xy(image_path, numX, numY, overlap=15, file_pattern="img_{ii}.tif"):
     # Check that the files exist
     file_pattern_r = file_pattern.replace("{ii}", "[0-9][0-9]")
 
-    file_list = list(image_path.glob(file_pattern_r))
+    # Sort the file list
+    file_list = sorted(list(image_path.glob(file_pattern_r)))
 
     if len(file_list) == 0:
         raise FileNotFoundError(
@@ -843,18 +901,12 @@ def stitch_xy(image_path, numX, numY, overlap=15, file_pattern="img_{ii}.tif"):
             f"Expected {numX * numY} files, but found only {len(file_list)}."
         )
 
-    # Load one file to get dimensions for the stitched image
-    image = sk.io.imread(file_list[0])
-
-    tile_h, tile_w = image.shape[:2]
-    dtype = image.dtype
-
-    # print(dtype)
-    # exit()
-
-    # To avoid needing to load ALL the images into memory at once, the plan is to load
-    # two rows. Once the top row is registered to the bottom, it can be popped off and
-    # the top row is now the bottom row and the code can continue.
+    # To avoid needing to load ALL the images into memory at once, the tiles are loaded
+    # incrementally. In short, when a tile is loaded, the code checks if the tile to the
+    # right and the tile below are loaded. If not, the respective tiles are loaded into
+    # memory. The current tile is then registered with respect to these two tiles. Once
+    # all tiles in a row is registered, the top row is then cleared from memory. This
+    # means that only two rows should be loaded at once.
 
     tile_cache = {}
 
@@ -864,8 +916,6 @@ def stitch_xy(image_path, numX, numY, overlap=15, file_pattern="img_{ii}.tif"):
     for row in range(numY):
         for col in range(numX):
             curr_tile_idx = (row * numX) + col
-
-            print(f"({row}, {col}): {curr_tile_idx}")
 
             if curr_tile_idx not in tile_cache:
                 tile_cache[curr_tile_idx] = sk.io.imread(file_list[curr_tile_idx])
@@ -885,7 +935,9 @@ def stitch_xy(image_path, numX, numY, overlap=15, file_pattern="img_{ii}.tif"):
                 )
 
             if row < (numY - 1):
+                # Load the bottom tile
                 bottom_tile_idx = curr_tile_idx + numX
+
                 if bottom_tile_idx not in tile_cache:
                     tile_cache[bottom_tile_idx] = sk.io.imread(
                         file_list[bottom_tile_idx]
@@ -903,11 +955,57 @@ def stitch_xy(image_path, numX, numY, overlap=15, file_pattern="img_{ii}.tif"):
                 idx_to_pop = (row - 1) * numX + col
                 tile_cache.pop(idx_to_pop, None)
 
-    # Clear out remaining tiles from registration phase
+    # Clear out remaining tiles
     tile_cache.clear()
 
-    # --- PASS 2: Global Optimization Solver ---
+    # Solve the global positions using a linear assignment
     abs_x, abs_y = _solve_global_positions(numX, numY, H_displacements, V_displacements)
+
+    return abs_x, abs_y
+
+
+def generate_tiled_image(
+    image_path,
+    file_pattern="img_{ii}.tif",
+    overlap=15,
+    abs_x=None,
+    abs_y=None,
+    stitch_position_file=None,
+):
+
+    # Check that the files exist
+    file_pattern_r = file_pattern.replace("{ii}", "[0-9][0-9]")
+
+    # Sort the file list
+    file_list = sorted(list(image_path.glob(file_pattern_r)))
+
+    # Validate the inputs
+    if stitch_position_file is None:
+        if abs_x is None:
+            raise ValueError(
+                "X-axis tile position must be specified if the stitching coordinate "
+                "file is not provided."
+            )
+        if abs_y is None:
+            raise ValueError(
+                "Y-axis tile position must be specified if the stitching coordinate "
+                "file is not provided."
+            )
+    else:
+        if abs_x is not None:
+            warnings.warn(
+                "The X-axis tile position is ignored since a stitching coordinate file was provided. To suppress this message, set abs_x = None."
+            )
+        if abs_y is not None:
+            warnings.warn(
+                "The Y-axis tile position is ignored since a stitching coordinate file was provided. To suppress this message, set abs_y = None."
+            )
+
+    # Load one file to get dimensions for the stitched image
+    image = sk.io.imread(file_list[0])
+
+    tile_h, tile_w = image.shape[:2]
+    dtype = image.dtype
 
     # --- PASS 3: Generate Canvas and Stream/Blend Images One-by-One ---
     canvas_w = int(np.max(abs_x) + tile_w)

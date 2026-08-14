@@ -6,7 +6,7 @@
 
 Computation times
 =================
-**00:00.694** total execution time for 1 file **from all galleries**:
+**00:00.939** total execution time for 2 files **from all galleries**:
 
 .. container::
 
@@ -32,6 +32,9 @@ Computation times
    * - Example
      - Time
      - Mem (MB)
+   * - :ref:`sphx_glr_auto_examples_plot_phasexcorr.py` (``..\examples\plot_phasexcorr.py``)
+     - 00:00.939
+     - 0.0
    * - :ref:`sphx_glr_auto_examples_plot_stitching_chelsea.py` (``..\examples\plot_stitching_chelsea.py``)
-     - 00:00.694
+     - 00:00.000
      - 0.0

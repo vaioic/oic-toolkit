@@ -1,6 +1,5 @@
 =========================
-Pipeline Example Gallery
+Examples
 =========================
 
-Below is a gallery of examples demonstrating how to use the microscope 
-stitching suite and shading correction workflows.
+This is a gallery of examples showcasing various functions in the toolkit.
