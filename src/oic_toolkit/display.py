@@ -65,6 +65,40 @@ def merge_images(image1, image2, normalize=True):
     return merged
 
 
+def overlay_mask(image, mask, normalize_image=True, mask_color=(0, 1, 0), alpha=0.3):
+
+    if not (image.shape == mask.shape):
+        raise ValueError(
+            f"Image and mask are not the same shape. (Image:{image.shape}, Mask:{mask.shape})"
+        )
+
+    if normalize_image:
+        # Normalize images to make sure they look good
+        image = sk.exposure.rescale_intensity(
+            image,
+            in_range=(0.3 * np.min(image), 0.7 * np.max(image)),
+            out_range=(0.0, 1.0),
+        )
+
+    # Convert grayscale image into rgb
+    if len(image.shape) < 3 or image.shape[2] == 1:
+        image = sk.color.gray2rgb(image)
+
+    # Merge the two images
+    H, W = image.shape[:2]
+
+    overlay = np.zeros((H, W, 3), dtype=image.dtype)
+
+    for iC in range(3):
+        overlay[..., iC] = (1 - alpha) * image[..., iC] + (
+            alpha * mask * mask_color[iC]
+        )
+
+    overlay = sk.util.img_as_ubyte(overlay)
+
+    return overlay
+
+
 def get_ROI(image, downsample_factor=None):
     """
     Manually select a region of interest.

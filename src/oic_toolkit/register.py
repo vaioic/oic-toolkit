@@ -90,6 +90,94 @@ def phasexcorr(target, moving, return_corrected=True):
         return results
 
 
+def crop_overlap(target, moving, shift, channel_axis=-1):
+    """Align two images/stacks using a shift vector and crop to their mutual overlap.
+
+    Supports 2D images [H, W], multi-channel images [H, W, C], or 3D stacks/t-series
+    [Z/C, H, W] of equal or unequal spatial dimensions.
+
+    Parameters
+    ----------
+    target : ndarray
+        Reference image or stack.
+    moving : ndarray
+        Moving image or stack to be shifted and cropped.
+    shift : array-like
+        The (y, x) translation shift vector to apply to 'moving'.
+    channel_axis : int or None, optional
+        Position of the channel/depth axis. Use -1 for [H, W, C] (default)
+        or 0 for [C, H, W] / [Z, H, W]. Set to None for pure 2D [H, W].
+
+    Returns
+    -------
+    target_cropped, moving_cropped : ndarray
+        Cropped target and registered moving arrays containing only valid mutual overlap.
+    """
+    sy, sx = np.round(shift).astype(int)
+
+    # Normalize channel axis indexing
+    ndim = target.ndim
+    if channel_axis is not None:
+        channel_axis = channel_axis % ndim
+
+    # Identify spatial axes indices (H, W)
+    if ndim == 2 or channel_axis is None:
+        spatial_axes = (0, 1)
+    elif channel_axis == 0:
+        spatial_axes = (1, 2)
+    elif channel_axis == ndim - 1:
+        spatial_axes = (0, 1)
+    else:
+        raise ValueError(f"Unsupported channel_axis={channel_axis} for {ndim}D array.")
+
+    h_t, w_t = target.shape[spatial_axes[0]], target.shape[spatial_axes[1]]
+    h_m, w_m = moving.shape[spatial_axes[0]], moving.shape[spatial_axes[1]]
+
+    # 1. Pad spatial dimensions to max canvas size if shapes differ
+    max_h, max_w = max(h_t, h_m), max(w_t, w_m)
+
+    def get_padding(shape):
+        pad = [(0, 0)] * ndim
+        pad[spatial_axes[0]] = (0, max_h - shape[spatial_axes[0]])
+        pad[spatial_axes[1]] = (0, max_w - shape[spatial_axes[1]])
+        return pad
+
+    target_canvas = (
+        np.pad(target, get_padding(target.shape), mode="constant")
+        if (h_t, w_t) != (max_h, max_w)
+        else target
+    )
+    moving_canvas = (
+        np.pad(moving, get_padding(moving.shape), mode="constant")
+        if (h_m, w_m) != (max_h, max_w)
+        else moving
+    )
+
+    # 2. Build N-dimensional shift vector for ndimage.shift (0 for non-spatial axes)
+    full_shift = [0.0] * ndim
+    full_shift[spatial_axes[0]] = float(shift[0])
+    full_shift[spatial_axes[1]] = float(shift[1])
+
+    moving_shifted = ndimage.shift(moving_canvas, shift=full_shift, cval=0.0)
+
+    # 3. Calculate overlapping spatial bounding box
+    y_start, y_end = max(0, sy), min(h_t, h_m + sy)
+    x_start, x_end = max(0, sx), min(w_t, w_m + sx)
+
+    if y_start >= y_end or x_start >= x_end:
+        raise ValueError(f"No spatial overlap exists for shift {shift}.")
+
+    # 4. Construct N-dimensional slice tuple
+    r_slice = slice(y_start, y_end)
+    c_slice = slice(x_start, x_end)
+
+    crop_slices = [slice(None)] * ndim
+    crop_slices[spatial_axes[0]] = r_slice
+    crop_slices[spatial_axes[1]] = c_slice
+
+    return target_canvas[tuple(crop_slices)], moving_shifted[tuple(crop_slices)]
+
+
 def shift_image(image, shift, crop=True, image_type="moving", tmp_shape=None):
     """
     Translate image.
@@ -122,6 +210,7 @@ def shift_image(image, shift, crop=True, image_type="moving", tmp_shape=None):
     r_end = min(h0, h0 + sy)
     c_start = max(0, sx)
     c_end = min(w0, w0 + sx)
+    print(f"Calculated size {r_start, r_end, c_start, c_end}")
 
     if image_type == "moving":
         shifted_image = ndimage.shift(image, shift=shift, cval=0.0)
@@ -131,10 +220,9 @@ def shift_image(image, shift, crop=True, image_type="moving", tmp_shape=None):
 
     elif image_type == "target":
         if crop:
-            print("Cropping target image")
             output = image[r_start:r_end, c_start:c_end]
     else:
-        output = image
+        raise ValueError("Unknown image type {image_type}.")
 
     return output
 
