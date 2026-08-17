@@ -67,7 +67,7 @@ def merge_images(image1, image2, normalize=True):
 
 def overlay_mask(image, mask, normalize_image=True, mask_color=(0, 1, 0), alpha=0.3):
 
-    if not (image.shape == mask.shape):
+    if not (image.shape[:2] == mask.shape):
         raise ValueError(
             f"Image and mask are not the same shape. (Image:{image.shape}, Mask:{mask.shape})"
         )
