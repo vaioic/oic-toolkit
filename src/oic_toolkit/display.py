@@ -66,7 +66,34 @@ def merge_images(image1, image2, normalize=True):
 
 
 def overlay_mask(image, mask, normalize_image=True, mask_color=(0, 1, 0), alpha=0.3):
+    """
+    Overlay mask on image.
 
+    Parameters
+    ----------
+    image : ndarray
+        Grayscale or RGB image
+    mask : array-like
+        Binary mask or label matrix
+    normalize_image : bool, optional
+        If True, normalizes the image intensity to its minimum and maximum
+        values to help improve the image appearance. By default, True.
+    mask_color : tuple, optional
+        Normalized RGB vector specifying the color for the mask, by default (0, 1, 0)
+    alpha : float, optional
+        Alpha value for the compositing image, by default 0.3. Increasing this number
+        will make the mask more visible.
+
+    Returns
+    -------
+    _type_
+        _description_
+
+    Raises
+    ------
+    ValueError
+        _description_
+    """
     if not (image.shape[:2] == mask.shape):
         raise ValueError(
             f"Image and mask are not the same shape. (Image:{image.shape}, Mask:{mask.shape})"

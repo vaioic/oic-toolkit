@@ -4,8 +4,8 @@ Registering two images using phase cross-correlation
 ====================================================
 
 This example uses the classic scikit-image cat Chelsea to demonstrate image registration
-using phase cross-correlation. In this example, we only consider translational shifts,
-but you can also use it for rotations.
+using phase cross-correlation. It is important to note that this approach only works for
+__translational__ shifts and will not work for rotational or scaling differences.
 """
 
 import matplotlib.pyplot as plt
@@ -14,8 +14,11 @@ import skimage as sk
 from scipy import ndimage
 from skimage.data import chelsea
 
-# Import your active processing functions
-from oic_toolkit.register import phasexcorr
+import oic_toolkit
+
+# %%
+# Example images
+# --------------
 
 # Import the Chelsea image as the example
 target_img = sk.color.rgb2gray(chelsea())
@@ -27,16 +30,29 @@ true_shift = (-18.5, 25.2)
 # Create the moved image
 moving_img = ndimage.shift(target_img, shift=(-true_shift[0], -true_shift[1]), cval=0.0)
 
+# Display the two images to show the translational shift
+merged = oic_toolkit.display.merge_images(target_img, moving_img)
+
+fig, ax = plt.subplots(figsize=(5, 5))
+ax.imshow(merged)
+ax.axis("off")
+plt.tight_layout()
+plt.show()
+
+# %%
+# Correct the images
+# ------------------
+
 # Perform the cross-correlation, returning the corrected images
-results, target_crop, moving_crop = phasexcorr(
+results, target_crop, moving_crop = oic_toolkit.register.phasexcorr(
     target_img, moving_img, return_corrected=True
 )
 
-print(f"Calculated Shift (y, x): {results['shift']}")
+print(f"Calculated Shift (y, x): {results['shift']}. Expected: {true_shift}.")
 print(f"Target Cropped Shape:    {target_crop.shape}")
 print(f"Moving Cropped Shape:    {moving_crop.shape}")
 
-# 4. Visualize
+# Visualize the resulting images and the difference between the target and corrected images
 fig, axes = plt.subplots(2, 3, figsize=(12, 4))
 
 axes[0, 0].imshow(target_img, cmap="gray")

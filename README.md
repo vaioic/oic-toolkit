@@ -33,8 +33,7 @@ uv run sphinx-build -b html docs docs/_build/html
 
 To view:
 ```bash
-cd docs/_build/html
-uv run python -m http.server 8001
+uv run python -m http.server 8001 --directory docs/_build/html
 ```
 Open browser and point to http://localhost:8001
 
