@@ -1,35 +1,35 @@
 """
 ====================================================
-Generating overlay images
+Merge images
 ====================================================
 
-This example shows how to use the ``overlay_mask`` function to generate overlay images
-to validate segmentation masks.
+In this example, we use the Chelsea cat image to demonstrate how the ``merge_images``
+function works. The image will be shifted slightly to demonstrate how this works.
 """
 
-import skimage
-from matplotlib import pyplot as plt
+import matplotlib.pyplot as plt
+import numpy as np
+import skimage as sk
+from scipy import ndimage
+from skimage.data import chelsea
 
 import oic_toolkit
 
-# %%
-# Import example images and a mask for testing
+# Import the Chelsea image as the example
+target_img = sk.color.rgb2gray(chelsea())
+h, w = target_img.shape
 
-data = skimage.data.cell()
+# Shift the image
+true_shift = (-18.5, 25.2)
 
-thresh = skimage.filters.threshold_otsu(data)
-mask = data > thresh
+# Create the moved image
+moving_img = ndimage.shift(target_img, shift=(-true_shift[0], -true_shift[1]), cval=0.0)
 
-# %%
-# Generate the overlay using default parameters
-overlay = oic_toolkit.display.overlay_mask(data, mask)
+# Display the two images to show the translational shift
+merged = oic_toolkit.display.merge_images(target_img, moving_img)
 
-plt.imshow(overlay)
-plt.show()
-
-# %%
-# Generate a different overlay, changing the mask color and the transparency
-overlay = oic_toolkit.display.overlay_mask(data, mask, mask_color=(1, 0, 1), alpha=0.8)
-
-plt.imshow(overlay)
+fig, ax = plt.subplots(figsize=(5, 5))
+ax.imshow(merged)
+ax.axis("off")
+plt.tight_layout()
 plt.show()

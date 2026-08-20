@@ -24,6 +24,16 @@ def merge_images(image1, image2, normalize=True):
     normalize : bool, optional
         If True, the image range is normalized by the maximum and minimum
         values in the image, by default True
+
+    Returns
+    -------
+    merged : ndarray (dtype=np.uint8)
+        The merged image with the mask overlay.
+
+    Raises
+    ------
+    ValueError
+        Both images must have the same shape.
     """
     if len(image1.shape) == 3:
         image1 = sk.color.rgb2gray(image1)
@@ -86,18 +96,34 @@ def overlay_mask(image, mask, normalize_image=True, mask_color=(0, 1, 0), alpha=
 
     Returns
     -------
-    _type_
-        _description_
+    image : ndarray (dtype=np.uint8)
+        The image with the mask overlay.
 
     Raises
     ------
     ValueError
-        _description_
+        The image and mask must have the same shape.
+    ValueError
+        Values for the mask color is not between 0.0 - 1.0.
+    ValueError
+        The mask color is not a valid RGB color.
+    ValueError
+        The alpha value is not between 0.0 - 1.0.
     """
+    # Validate the inputs
     if not (image.shape[:2] == mask.shape):
         raise ValueError(
             f"Image and mask are not the same shape. (Image:{image.shape}, Mask:{mask.shape})"
         )
+
+    if not all(0 <= x <= 1 for x in mask_color):
+        raise ValueError("Values for the mask color must be between 0.0 - 1.0.")
+
+    if len(mask_color) != 3:
+        raise ValueError("The mask color must be an RGB vector.")
+
+    if not (0 <= alpha <= 1):
+        raise ValueError("The alpha value must be between 0.0 - 1.0.")
 
     if normalize_image:
         # Normalize images to make sure they look good
@@ -111,19 +137,14 @@ def overlay_mask(image, mask, normalize_image=True, mask_color=(0, 1, 0), alpha=
     if len(image.shape) < 3 or image.shape[2] == 1:
         image = sk.color.gray2rgb(image)
 
-    # Merge the two images
-    H, W = image.shape[:2]
-
-    overlay = np.zeros((H, W, 3), dtype=image.dtype)
-
+    # Overlay the mask
     for iC in range(3):
-        overlay[..., iC] = (1 - alpha) * image[..., iC] + (
-            alpha * mask * mask_color[iC]
-        )
+        curr_slice = image[..., iC]
+        curr_slice[mask] = (1 - alpha) * curr_slice[mask] + (alpha * mask_color[iC])
 
-    overlay = sk.util.img_as_ubyte(overlay)
+    image = sk.util.img_as_ubyte(image)
 
-    return overlay
+    return image
 
 
 def get_ROI(image, downsample_factor=None):

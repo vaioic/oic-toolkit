@@ -3,8 +3,8 @@ Welcome to the OIC Toolkit Wiki!
 =================================
 
 The ``oic-toolkit`` is a consolidated Python package of useful image analysis functions 
-developed by the Van Andel Institute Optical Imaging Core. The toolkit features a blend
-of custom algorithms and workflows derived from scikit-image and scipy.
+developed by the [Optical Imaging Core](https://opticalimagingcore.vai.org/) at [Van Andel Institute](https://www.vai.org/). The toolkit features a blend
+of custom algorithms and workflows derived from ``scikit-image`` and ``scipy``.
 
 Features
 --------
