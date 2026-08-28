@@ -7,13 +7,27 @@ from matplotlib.patches import Rectangle
 from matplotlib.widgets import RectangleSelector
 
 
-def merge_images(image1, image2, normalize=True):
+def merge_images(
+    image1,
+    image2,
+    mode="magenta-green",
+    normalize=True,
+    alpha=0.5,
+):
     """
-    Merge images in magenta-green mode.
+    Merge two images.
 
-    In this mode, images that perfectly
-    overlap will display in gray, but misalignments will show as magenta and
-    green.
+    This function merges two images into a single image for display or saving. The way
+    the merge is carried out is specified by the ``mode`` parameter. Currently, two
+    modes exist:
+       * "magenta-green" - Plots the first image in magenta, and the second as green.
+                           This mode is most useful to look for image overlaps as
+                           overlapping regions will appear in grayscale.
+       * "blend" - Carried out alpha blending. The degree of blending can be tuned by
+                   changing the ``alpha`` property.
+
+    The two images can be of different size. The resulting image will be cropped to the
+    smallest dimension of the two inputs.
 
     Parameters
     ----------
@@ -21,9 +35,13 @@ def merge_images(image1, image2, normalize=True):
         Image 1, displayed in magenta
     image2 : np.array
         Image 2, displayed in green
+    mode : str, optional
+        Specifies how the image merge should be carried out. By default, "magenta-green"
     normalize : bool, optional
         If True, the image range is normalized by the maximum and minimum
         values in the image, by default True
+    alpha : float, optional
+        Value between 0.0 and 1.0 for alpha blending. By default, 0.5.
 
     Returns
     -------
@@ -33,44 +51,60 @@ def merge_images(image1, image2, normalize=True):
     Raises
     ------
     ValueError
-        Both images must have the same shape.
+        The mode property is not recognized.
     """
-    if len(image1.shape) == 3:
-        image1 = sk.color.rgb2gray(image1)
-
-    if len(image2.shape) == 3:
-        image2 = sk.color.rgb2gray(image2)
-
     # Trim images to the smaller of the two dimensions
     hf = np.min([image1.shape[0], image2.shape[0]])
     wf = np.min([image1.shape[1], image2.shape[1]])
 
-    image1 = image1[:hf, :wf]
-    image2 = image2[:hf, :wf]
+    image1 = image1[:hf, :wf, ...]
+    image2 = image2[:hf, :wf, ...]
 
-    if not (image1.shape == image2.shape):
-        raise ValueError(
-            f"The two images are not the same shape. (Image1:{image1.shape}, Image2:{image2.shape})"
-        )
+    match mode:
+        case "magenta-green":
+            if len(image1.shape) == 3:
+                image1 = sk.color.rgb2gray(image1)
 
-    if normalize:
-        # Normalize images to make sure they look good
-        image1 = sk.exposure.rescale_intensity(
-            image1, in_range="image", out_range=(0.0, 1.0)
-        )
+            if len(image2.shape) == 3:
+                image2 = sk.color.rgb2gray(image2)
 
-        image2 = sk.exposure.rescale_intensity(
-            image2, in_range="image", out_range=(0.0, 1.0)
-        )
+            if normalize:
+                # Normalize images to make sure they look good
+                image1 = sk.exposure.rescale_intensity(
+                    image1, in_range="image", out_range=(0.0, 1.0)
+                )
 
-    image1 = sk.util.img_as_ubyte(image1)
-    image2 = sk.util.img_as_ubyte(image2)
+                image2 = sk.exposure.rescale_intensity(
+                    image2, in_range="image", out_range=(0.0, 1.0)
+                )
 
-    merged = np.zeros((image1.shape[0], image1.shape[1], 3), dtype=np.uint8)
+            image1 = sk.util.img_as_ubyte(image1)
+            image2 = sk.util.img_as_ubyte(image2)
 
-    merged[..., 0] = image1
-    merged[..., 1] = image2
-    merged[..., 2] = image1
+            merged = np.zeros((image1.shape[0], image1.shape[1], 3), dtype=np.uint8)
+
+            merged[..., 0] = image1
+            merged[..., 1] = image2
+            merged[..., 2] = image1
+
+        case "blend":
+            # Check that both images are rgb
+            if (len(image1.shape) == 2) or (image1.shape[2] == 1):
+                image1 = sk.color.gray2rgb(image1)
+
+            if (len(image2.shape) == 2) or (image2.shape[2] == 1):
+                image2 = sk.color.gray2rgb(image2)
+
+            image1 = sk.util.img_as_float(image1)
+            image2 = sk.util.img_as_float(image2)
+
+            merged = (1 - alpha) * image1 + (alpha * image2)
+
+            # Round and case back to uint8
+            merged = (merged * 255).astype(np.uint8)
+
+        case _:
+            raise ValueError(f"Unknown mode: {mode}")
 
     return merged
 
@@ -111,9 +145,9 @@ def overlay_mask(image, mask, normalize_image=True, mask_color=(0, 1, 0), alpha=
         The alpha value is not between 0.0 - 1.0.
     """
     # Validate the inputs
-    if not (image.shape[:2] == mask.shape):
+    if not (image.shape[:2] == mask.shape[:2]):
         raise ValueError(
-            f"Image and mask are not the same shape. (Image:{image.shape}, Mask:{mask.shape})"
+            f"Image and mask do not have the same height and width. (Image:{image.shape[:2]}, Mask:{mask.shape[:2]})"
         )
 
     if not all(0 <= x <= 1 for x in mask_color):
@@ -124,6 +158,10 @@ def overlay_mask(image, mask, normalize_image=True, mask_color=(0, 1, 0), alpha=
 
     if not (0 <= alpha <= 1):
         raise ValueError("The alpha value must be between 0.0 - 1.0.")
+
+    # Check if that the mask is binary or a label
+    if mask.dtype != bool:
+        mask = mask > 0
 
     if normalize_image:
         # Normalize images to make sure they look good

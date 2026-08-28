@@ -112,5 +112,13 @@ uv run pytest
 
 ## Changelog
 
+### v0.3.0 (Unreleased)
+* [ENHANCEMENT] Updated the ``merge_images`` function to include alpha blending
+* [DOC] Updated documentation to include examples of alpha blending
+
+### v0.2.1 (2027-07-08)
+* Added 2D stitching
+* Added sphinx documentation
+
 ### v0.1.0 (2027-07-02)
-* Initial release with common segmentation and registration functions.
+* Initial release with common segmentation and registration functions

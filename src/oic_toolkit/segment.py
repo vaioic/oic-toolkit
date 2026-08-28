@@ -118,11 +118,17 @@ def separate_objects(mask, h_value=3.0, min_distance=10, threshold_abs=5):
     distance = ndi.distance_transform_edt(mask)
 
     # Suppress maxima to avoid over-segmentation
-    h_suppressed = sk.morphology.h_maxima(distance, h_value)
-    filtered_distance = np.where(h_suppressed, distance, 0)
+    if h_value is None:
+        filtered_distance = distance
+    else:
+        h_suppressed = sk.morphology.h_maxima(distance, h_value)
+        filtered_distance = np.where(h_suppressed, distance, 0)
 
     coords = sk.feature.peak_local_max(
-        filtered_distance, footprint=None, min_distance=10, threshold_abs=5
+        filtered_distance,
+        footprint=None,
+        min_distance=min_distance,
+        threshold_abs=threshold_abs,
     )
 
     peak_mask = np.zeros(distance.shape, dtype=bool)

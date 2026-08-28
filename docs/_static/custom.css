@@ -1,0 +1,42 @@
+/* --- LIGHT MODE (Clinical & Professional) --- */
+html[data-theme="light"] {
+    /* Primary brand colors: Deep VAI Navy and Bright Alert Accents */
+    --pst-color-primary: #002D62;        /* Main dark institute navy */
+    --pst-color-secondary: #0056B3;      /* Slightly brighter blue for hover/links */
+    
+    /* Layout canvas & structure */
+    --pst-color-background: #FFFFFF;     /* Pure white for clear reading */
+    --pst-color-surface: #F4F6F9;        /* Light clean slate for sidebars/search */
+    
+    /* Document elements */
+    --pst-color-text-base: #1C2430;      /* Dark off-black for body text text */
+    --pst-color-text-muted: #5C6A79;     /* Gray for captions and sidebar meta text */
+    --pst-color-inline-code: #C82333;    /* Distinct medical/scientific dark red code blocks */
+}
+
+/* --- DARK MODE (Premium Biomedical Dark) --- */
+html[data-theme="dark"] {
+    /* Glowing brand elements against midnight tones */
+    --pst-color-primary: #4B9CD3;        /* Softened bright blue for dark readability */
+    --pst-color-secondary: #7DC2F4;      /* Lighter highlight color */
+    
+    /* Dark lab/terminal environment */
+    --pst-color-background: #0B111E;     /* Deep navy-tinted black background */
+    --pst-color-surface: #172237;        /* Medium navy slate for panels/code background */
+    
+    /* Typography */
+    --pst-color-text-base: #E6EDF5;      /* Highly readable crisp white-blue text */
+    --pst-color-text-muted: #8FA0B5;     /* De-emphasized gray-blue for secondary labels */
+    --pst-color-inline-code: #FF7B72;    /* Pastel coral code blocks */
+}
+
+/* --- BRAND POLISHES (Optional theme improvements) --- */
+/* Match the top header bar brand alignment */
+.bd-header {
+    border-bottom: 2px solid var(--pst-color-primary) !important;
+}
+
+/* Enhance admonition layout visibility */
+.admonition {
+    border-left-width: 4px !important;
+}
