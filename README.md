@@ -112,6 +112,8 @@ uv run pytest
 
 ## Changelog
 
+### v0.4.0 (Unreleased)
+
 ### v0.3.0 (2026-10-07)
 * [ENHANCEMENT] Updated the ``merge_images`` function to include alpha blending
 * [DOC] Updated documentation to include examples of alpha blending
