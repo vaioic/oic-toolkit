@@ -112,9 +112,10 @@ uv run pytest
 
 ## Changelog
 
-### v0.3.0 (Unreleased)
+### v0.3.0 (2026-10-07)
 * [ENHANCEMENT] Updated the ``merge_images`` function to include alpha blending
 * [DOC] Updated documentation to include examples of alpha blending
+* [ADDED] Functions to extract metadata from ND2 files
 
 ### v0.2.1 (2027-07-08)
 * Added 2D stitching
